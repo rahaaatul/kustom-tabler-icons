@@ -2,7 +2,7 @@ name: Modify Icons
 
 on:
   workflow_run:
-    workflows: ["Sync Fork with Upstream"]
+    workflows: ["Sync Upstream Icons"]
     types:
       - completed
       
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout your forked repository
+      # Step 1: Checkout Fork Repo
       - name: Checkout Fork Repo
         uses: actions/checkout@v3
         with:
@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: '20'
 
-      # Step 3: Install global npm package `oslllo-svg-fixer`
+      # Step 3: Install oslllo-svg-fixer
       - name: Install oslllo-svg-fixer
         run: npm install -g oslllo-svg-fixer
 
@@ -35,22 +35,20 @@ jobs:
           mkdir -p icons/combined
           mkdir -p temp-icons
 
-      # Step 5: Move and rename icons
+      # Step 5: Move and Rename Icons
       - name: Move and Rename Filled Icons
         run: |
-          set -e
           for file in icons/filled/*.svg; do
             mv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg";
           done
 
-      - name: Rename Outline Icons
+      - name: Move and Rename Outline Icons
         run: |
-          set -e
           for file in icons/outline/*.svg; do
             mv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg";
           done
 
-      # Step 6: Run oslllo-svg-fixer on the renamed files
+      # Step 6: Run oslllo-svg-fixer
       - name: Run oslllo-svg-fixer
         run: oslllo-svg-fixer --source temp-icons --destination icons/combined
 
@@ -65,6 +63,29 @@ jobs:
           git commit -m "Processed and updated SVG icons in combined folder"
           git push
 
-      # Step 8: Clean up temporary folder
-      - name: Clean up
-        run: rm -rf temp-icons
+      # Step 8: Zip the icons/combined folder
+      - name: Zip Icons
+        run: zip -r kustom-tabler-icons.zip icons/combined
+
+      # Step 9: Create a GitHub Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "latest"
+          release_name: "Kustom Tabler Icons"
+          draft: false
+          prerelease: false
+
+      # Step 10: Upload zip file to the release
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./kustom-tabler-icons.zip
+          asset_name: kustom-tabler-icons.zip
+          asset_content_type: application/zip
