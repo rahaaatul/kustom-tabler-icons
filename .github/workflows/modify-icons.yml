@@ -59,10 +59,15 @@ jobs:
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git add icons/combined/*
-          git status  # Show the status of the files to ensure changes are tracked
-          git commit -m "Processed and updated SVG icons in combined folder"
-          git push
+          git add icons/combined/
+          git status
+          if git commit -m "Processed and updated SVG icons in combined folder"; then
+            echo "Committed changes."
+            git push
+          else
+            echo "No changes to commit or commit failed."
+            exit 1
+          fi
 
       # Step 8: Zip the icons/combined folder
       - name: Zip Icons

@@ -31,26 +31,54 @@ jobs:
 
       # Step 4: Exit if no changes
       - name: Exit if No Changes
-        if: ${{ success() }}
+        if: ${{ steps.check_changes.outcome == 'success' }}
         run: |
           echo "No changes detected in icons. Exiting."
           exit 0
 
       # Step 5: Sync icons folder from upstream
       - name: Sync Icons Folder
-        if: ${{ failure() }}
+        if: ${{ steps.check_changes.outcome == 'failure' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git checkout upstream/main -- icons/filled icons/outline
-          git commit -m "Synced icons folders from upstream"
-          git push origin main
+
+          # Checkout icons/filled and icons/outline from upstream
+          if git checkout upstream/main -- icons/filled icons/outline; then
+            echo "Checked out icons/filled and icons/outline from upstream."
+          else
+            echo "Failed to check out icons. Exiting."
+            exit 1
+          fi
+
+          # Add changes to staging
+          if git add icons/filled icons/outline; then
+            echo "Staged changes for commit."
+          else
+            echo "Failed to stage changes. Exiting."
+            exit 1
+          fi
+
+          # Commit changes if there are any
+          if git commit -m "Synced icons folders from upstream"; then
+            echo "Committed changes."
+          else
+            echo "No changes to commit."
+          fi
+
+          # Push changes to origin
+          if git push origin main; then
+            echo "Pushed changes to origin."
+          else
+            echo "Failed to push changes. Exiting."
+            exit 1
+          fi
 
       # Step 6: Trigger modify-icons.yml workflow
       - name: Trigger Modify Icons Workflow
-        if: ${{ failure() }}
+        if: ${{ steps.check_changes.outcome == 'failure' }}
         run: |
           echo "Triggering modify-icons workflow"
           curl -X POST \
