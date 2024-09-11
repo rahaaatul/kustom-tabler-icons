@@ -5,7 +5,6 @@ on:
     workflows: ["Sync Upstream Icons"]
     types:
       - completed
-
   workflow_dispatch:
 
 jobs:
@@ -39,13 +38,13 @@ jobs:
       - name: Move and Rename Filled Icons
         run: |
           for file in icons/filled/*.svg; do
-            mv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg";
+            mv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg"
           done
 
       - name: Move and Rename Outline Icons
         run: |
           for file in icons/outline/*.svg; do
-            mv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg";
+            mv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg"
           done
 
       # Step 6: Run oslllo-svg-fixer
@@ -77,7 +76,8 @@ jobs:
       - name: Fetch Latest Tag from Upstream
         id: fetch_tag
         run: |
-          LATEST_TAG=$(git ls-remote --tags https://github.com/tabler/tabler-icons.git | grep -o 'refs/tags/.*' | sed 's/refs\/tags\///' | sort -V | tail -n1)
+          LATEST_TAG=$(git ls-remote --tags https://github.com/tabler/tabler-icons.git | \
+          grep -o 'refs/tags/.*' | sed 's/refs\/tags\///' | sort -V | tail -n1)
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
       # Step 10: Create or Update GitHub Release
@@ -87,18 +87,23 @@ jobs:
           TAG_NAME="${{ env.LATEST_TAG }}"
           RELEASE_NAME="Kustom Tabler Icons - $TAG_NAME"
           API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
-
+          
           # Check if release with tag already exists
-          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL | jq -r ".[] | select(.tag_name == \"$TAG_NAME\") | .id")
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL | \
+          jq -r ".[] | select(.tag_name == \"$TAG_NAME\") | .id")
 
           if [ -z "$RELEASE_ID" ]; then
             # Create a new release if it doesn't exist
-            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
-            -d '{"tag_name": "'"$TAG_NAME"'","name": "'"$RELEASE_NAME"'","draft": false,"prerelease": false}' $API_URL
+            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"tag_name": "'"$TAG_NAME"'","name": "'"$RELEASE_NAME"'","draft": false,"prerelease": false}' \
+            $API_URL
           else
             # Update the existing release if it does
-            curl -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
-            -d '{"name": "'"$RELEASE_NAME"'"}' "$API_URL/$RELEASE_ID"
+            curl -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"name": "'"$RELEASE_NAME"'"}' \
+            "$API_URL/$RELEASE_ID"
           fi
 
       # Step 11: Upload zip file to the release
