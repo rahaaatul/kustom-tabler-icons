@@ -5,7 +5,7 @@ on:
     workflows: ["Sync Upstream Icons"]
     types:
       - completed
-      
+
   workflow_dispatch:
 
 jobs:
@@ -73,25 +73,41 @@ jobs:
       - name: Zip Icons
         run: zip -r kustom-tabler-icons.zip icons/combined
 
-      # Step 9: Create a GitHub Release
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: "latest"
-          release_name: "Kustom Tabler Icons"
-          draft: false
-          prerelease: false
+      # Step 9: Fetch Latest Tag from Upstream
+      - name: Fetch Latest Tag from Upstream
+        id: fetch_tag
+        run: |
+          LATEST_TAG=$(git ls-remote --tags https://github.com/tabler/tabler-icons.git | grep -o 'refs/tags/.*' | sed 's/refs\/tags\///' | sort -V | tail -n1)
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
-      # Step 10: Upload zip file to the release
+      # Step 10: Create or Update GitHub Release
+      - name: Create or Update GitHub Release
+        id: create_or_update_release
+        run: |
+          TAG_NAME="${{ env.LATEST_TAG }}"
+          RELEASE_NAME="Kustom Tabler Icons - $TAG_NAME"
+          API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
+
+          # Check if release with tag already exists
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL | jq -r ".[] | select(.tag_name == \"$TAG_NAME\") | .id")
+
+          if [ -z "$RELEASE_ID" ]; then
+            # Create a new release if it doesn't exist
+            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
+            -d '{"tag_name": "'"$TAG_NAME"'","name": "'"$RELEASE_NAME"'","draft": false,"prerelease": false}' $API_URL
+          else
+            # Update the existing release if it does
+            curl -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" \
+            -d '{"name": "'"$RELEASE_NAME"'"}' "$API_URL/$RELEASE_ID"
+          fi
+
+      # Step 11: Upload zip file to the release
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.create_or_update_release.outputs.upload_url }}
           asset_path: ./kustom-tabler-icons.zip
           asset_name: kustom-tabler-icons.zip
           asset_content_type: application/zip
