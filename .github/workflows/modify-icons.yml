@@ -29,10 +29,9 @@ jobs:
         run: npm install -g oslllo-svg-fixer
 
       # Step 4: Create necessary folders
-      - name: Create necessary folders
+      - name: Create Necessary Folders
         run: |
-          mkdir -p icons/combined
-          mkdir -p temp-icons
+          mkdir -p icons/combined temp-icons
 
       # Step 5: Move and Rename Icons
       - name: Move and Rename Filled Icons
@@ -68,7 +67,7 @@ jobs:
             exit 1
           fi
 
-      # Step 8: Zip the icons/combined folder
+      # Step 8: Zip the Icons
       - name: Zip Icons
         run: zip -r kustom-tabler-icons.zip icons/combined
 
@@ -89,30 +88,31 @@ jobs:
           API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
           
           # Check if release with tag already exists
-          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL | \
-          jq -r ".[] | select(.tag_name == \"$TAG_NAME\") | .id")
-
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL)
+          RELEASE_ID=$(echo "$RESPONSE" | jq -r ".[] | select(.tag_name == \"$TAG_NAME\") | .id")
+          
           if [ -z "$RELEASE_ID" ]; then
             # Create a new release if it doesn't exist
-            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            RESPONSE=$(curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             -d '{"tag_name": "'"$TAG_NAME"'","name": "'"$RELEASE_NAME"'","draft": false,"prerelease": false}' \
-            $API_URL
+            $API_URL)
           else
             # Update the existing release if it does
-            curl -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            RESPONSE=$(curl -s -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             -d '{"name": "'"$RELEASE_NAME"'"}' \
-            "$API_URL/$RELEASE_ID"
+            "$API_URL/$RELEASE_ID")
           fi
+          
+          UPLOAD_URL=$(echo "$RESPONSE" | jq -r ".upload_url" | sed 's/{?name,label}//')
+          echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
 
-      # Step 11: Upload zip file to the release
+      # Step 11: Upload Release Asset
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_or_update_release.outputs.upload_url }}
+          upload_url: ${{ env.UPLOAD_URL }}
           asset_path: ./kustom-tabler-icons.zip
           asset_name: kustom-tabler-icons.zip
           asset_content_type: application/zip
