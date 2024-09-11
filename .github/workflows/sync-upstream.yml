@@ -2,7 +2,7 @@ name: Sync Upstream Icons
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Every day at midnight
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -24,17 +24,21 @@ jobs:
 
       # Step 3: Check for changes in icons/filled and icons/outline
       - name: Check for Changes
+        id: check_changes
         run: |
           git diff --quiet origin/main upstream/main -- icons/filled/ icons/outline/
         continue-on-error: true
 
       # Step 4: Exit if no changes
       - name: Exit if No Changes
-        if: success()
-        run: exit 0
+        if: ${{ success() }}
+        run: |
+          echo "No changes detected in icons. Exiting."
+          exit 0
 
       # Step 5: Sync icons folder from upstream
       - name: Sync Icons Folder
+        if: ${{ failure() }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -44,11 +48,11 @@ jobs:
           git commit -m "Synced icons folders from upstream"
           git push origin main
 
-      # Step 6: Trigger modify-icons.yml
+      # Step 6: Trigger modify-icons.yml workflow
       - name: Trigger Modify Icons Workflow
-        if: success()
+        if: ${{ failure() }}
         run: |
-          echo "Triggering processing workflow"
+          echo "Triggering modify-icons workflow"
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
