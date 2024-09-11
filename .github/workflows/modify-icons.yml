@@ -1,0 +1,70 @@
+name: Modify Icons
+
+on:
+  workflow_run:
+    workflows: ["Sync Fork with Upstream"]
+    types:
+      - completed
+      
+  workflow_dispatch:
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout your forked repository
+      - name: Checkout Fork Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # Step 3: Install global npm package `oslllo-svg-fixer`
+      - name: Install oslllo-svg-fixer
+        run: npm install -g oslllo-svg-fixer
+
+      # Step 4: Create necessary folders
+      - name: Create necessary folders
+        run: |
+          mkdir -p icons/combined
+          mkdir -p temp-icons
+
+      # Step 5: Move and rename icons
+      - name: Move and Rename Filled Icons
+        run: |
+          set -e
+          for file in icons/filled/*.svg; do
+            mv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg";
+          done
+
+      - name: Rename Outline Icons
+        run: |
+          set -e
+          for file in icons/outline/*.svg; do
+            mv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg";
+          done
+
+      # Step 6: Run oslllo-svg-fixer on the renamed files
+      - name: Run oslllo-svg-fixer
+        run: oslllo-svg-fixer --source temp-icons --destination icons/combined
+
+      # Step 7: Commit and Push Changes
+      - name: Commit and Push Changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add icons/combined
+          git commit -m "Processed and updated SVG icons in combined folder"
+          git push
+
+      # Step 8: Clean up temporary folder
+      - name: Clean up
+        run: rm -rf temp-icons
