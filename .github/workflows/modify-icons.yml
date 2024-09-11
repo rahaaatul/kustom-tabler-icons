@@ -35,35 +35,35 @@ jobs:
       - name: Move and Rename Filled Icons
         run: |
           for file in icons/filled/*.svg; do
-            mv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg"
+            mv -fv "$file" "icons/combined/$(basename "${file%.svg}")-filled.svg"
           done
 
       - name: Move and Rename Outline Icons
         run: |
           for file in icons/outline/*.svg; do
-            mv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg"
+            mv -fv "$file" "temp-icons/$(basename "${file%.svg}")-outline.svg"
           done
 
       # Step 6: Run oslllo-svg-fixer
       - name: Run oslllo-svg-fixer
         run: oslllo-svg-fixer --source temp-icons --destination icons/combined
 
-      # Step 7: Commit and Push Changes
-      - name: Commit and Push Changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git add icons/combined/
-          git status
-          if git commit -m "Processed and updated SVG icons in combined folder"; then
-            echo "Committed changes."
-            git push
-          else
-            echo "No changes to commit or commit failed."
-            exit 1
-          fi
+      # # Step 7: Commit and Push Changes
+      # - name: Commit and Push Changes
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     git config user.name "${{ github.actor }}"
+      #     git config user.email "${{ github.actor }}@users.noreply.github.com"
+      #     git add icons/combined/
+      #     git status
+      #     if git commit -m "Processed and updated SVG icons in combined folder"; then
+      #       echo "Committed changes."
+      #       git push
+      #     else
+      #       echo "No changes to commit or commit failed."
+      #       exit 1
+      #     fi
 
       # Step 8: Zip the Icons
       - name: Zip Icons
@@ -84,7 +84,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP_FILE }}
-          name: "Kustom Tabler Icons ${{ steps.fetch_tag.outputs.latest_tag }}"
-          tag_name: ${{ steps.fetch_tag.outputs.latest_tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: "Kustom Tabler Icons ${{ env.LATEST_TAG }}"
+          tag_name: ${{ env.LATEST_TAG }}
+          token: ${{ github.token }}
