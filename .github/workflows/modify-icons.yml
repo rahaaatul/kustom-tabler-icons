@@ -5,7 +5,6 @@ on:
     workflows: ["Sync Upstream Icons"]
     types:
       - completed
-  workflow_dispatch:
 
 jobs:
   process:
@@ -71,26 +70,19 @@ jobs:
       - name: Zip Icons
         run: zip -r kustom-tabler-icons.zip icons/combined
 
-      # Step 9: Fetch Latest Tag from Upstream and Set Output
+      # Step 9: Fetch Latest Tag from Upstream
       - name: Fetch Latest Tag from Upstream
         id: fetch_tag
         run: |
           LATEST_TAG=$(git ls-remote --tags https://github.com/tabler/tabler-icons.git | \
           grep -o 'refs/tags/.*' | sed 's/refs\/tags\///' | sort -V | tail -n1)
-          echo "::set-output name=LATEST_TAG::$LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
-    outputs:
-      LATEST_TAG: ${{ steps.fetch_tag.outputs.LATEST_TAG }}
-      
-  # Step 10: Create or Update GitHub Release
-  release:
-    runs-on: ubuntu-latest
-    needs: process
-    steps:
+      # Step 10: Create or Update GitHub Release
       - name: Create or Update GitHub Release
         id: create_or_update_release
         run: |
-          TAG_NAME="${{ needs.process.outputs.LATEST_TAG }}"
+          TAG_NAME="${{ env.LATEST_TAG }}"
           RELEASE_NAME="Kustom Tabler Icons - $TAG_NAME"
           API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
           
@@ -105,7 +97,6 @@ jobs:
             -d '{"tag_name": "'"$TAG_NAME"'","name": "'"$RELEASE_NAME"'","draft": false,"prerelease": false}' \
             $API_URL)
             UPLOAD_URL=$(echo "$RESPONSE" | jq -r ".upload_url" | sed 's/{?name,label}//')
-            echo "::set-output name=upload_url::$UPLOAD_URL"
           else
             # Update the existing release if it does
             RESPONSE=$(curl -s -X PATCH -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
@@ -113,21 +104,13 @@ jobs:
             -d '{"name": "'"$RELEASE_NAME"'"}' \
             "$API_URL/$RELEASE_ID")
             UPLOAD_URL=$(echo "$RESPONSE" | jq -r ".upload_url" | sed 's/{?name,label}//')
-            echo "::set-output name=upload_url::$UPLOAD_URL"
           fi
 
-    outputs:
-      upload_url: ${{ steps.create_or_update_release.outputs.upload_url }}
-
-  # Step 11: Upload the zip file to the GitHub release
-  upload:
-    runs-on: ubuntu-latest
-    needs: release
-    steps:
+      # Step 11: Upload zip file to the release
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ env.UPLOAD_URL }}
           asset_path: ./kustom-tabler-icons.zip
           asset_name: kustom-tabler-icons.zip
           asset_content_type: application/zip
