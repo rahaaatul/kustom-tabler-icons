@@ -1,9 +1,8 @@
-name: Sync Fork with Upstream
+name: Sync Upstream Icons
 
 on:
-  # Runs this workflow on a schedule (e.g., once a day) or manually
   schedule:
-    - cron: '0 0 * * *' # every day at midnight
+    - cron: '0 0 * * *'  # Every day at midnight
   workflow_dispatch:
 
 jobs:
@@ -17,40 +16,37 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Step 2: Add upstream repo and fetch updates
-      - name: Add and Fetch Upstream
+      # Step 2: Add and fetch upstream remote
+      - name: Add Upstream Remote
         run: |
           git remote add upstream https://github.com/tabler/tabler-icons.git
           git fetch upstream
 
-      # Step 3: Check for Upstream Changes
-      - name: Check for Upstream Changes
-        id: check_upstream_changes
+      # Step 3: Check for changes in icons/filled and icons/outline
+      - name: Check for Changes
         run: |
-          UPSTREAM_COMMIT=$(git rev-parse upstream/main)
-          FORK_COMMIT=$(git rev-parse origin/main)
+          git diff --quiet origin/main upstream/main -- icons/filled/ icons/outline/
+        continue-on-error: true
 
-          if [ "$UPSTREAM_COMMIT" = "$FORK_COMMIT" ]; then
-            echo "No upstream changes detected. Exiting."
-            exit 0
-          else
-            echo "Upstream changes detected. Proceeding with the workflow."
-          fi
+      # Step 4: Exit if no changes
+      - name: Exit if No Changes
+        if: success()
+        run: exit 0
 
-      # Step 4: Rebase fork with upstream
-      - name: Rebase Fork with Upstream
+      # Step 5: Sync icons folder from upstream
+      - name: Sync Icons Folder
         run: |
-          git checkout main
-          git rebase upstream/main
-          git push --force-with-lease origin main
+          git checkout upstream/main -- icons/filled icons/outline
+          git commit -m "Synced icons folders from upstream"
+          git push origin main
 
-      # Step 5: Trigger Processing Workflow (using `workflow_run`)
-      - name: Trigger Processing Workflow
+      # Step 6: Trigger modify-icons.yml
+      - name: Trigger Modify Icons Workflow
         if: success()
         run: |
           echo "Triggering processing workflow"
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/process-icons.yml/dispatches \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/modify-icons.yml/dispatches \
             -d '{"ref": "main"}'
