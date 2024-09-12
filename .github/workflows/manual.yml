@@ -1,119 +1,117 @@
 name: Manual Icon Modifier
 
 on:
-    workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-    sync:
-        runs-on: ubuntu-latest
-        steps:
-            # Step 1: Checkout Repository
-            - name: Checkout Repo
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout Repository
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            # Step 2: Sync icons folder from upstream
-            - name: Sync Upstream Icons
-              run: |
-                  git config user.name "${{ github.actor }}"
-                  git config user.email "${{ github.actor }}@users.noreply.github.com"
-                  git remote get-url upstream || git remote add upstream https://github.com/tabler/tabler-icons.git
-                  git fetch upstream
-                  git checkout upstream/main -- icons/filled icons/outline
-                  git add icons/filled icons/outline
-                  if git diff --cached --quiet; then
-                    echo "Icons are up to date."
-                    exit 0
-                  else
-                    git checkout -b temp
-                    git commit -m "Synced Icons"
-                    git checkout main
-                    git reset --hard temp
-                    git push origin main --force
-                    git branch -d temp
-                  fi
+      # Step 2: Sync icons folder from upstream
+      - name: Sync Upstream Icons
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git remote get-url upstream || git remote add upstream https://github.com/tabler/tabler-icons.git
+          git fetch upstream
+          git checkout upstream/main -- icons/filled icons/outline
+          git add icons/filled icons/outline
+          if git diff --cached --quiet; then
+            echo "Icons are up to date."
+            exit 0
+          else
+            git checkout -b temp
+            git commit -m "Synced Icons"
+            git checkout main
+            git reset --hard temp
+            git push origin main --force
+            git branch -d temp
+          fi
 
-    process:
-        runs-on: ubuntu-latest
-        needs: sync
-        env:
-            TEMP: "temp"
-            FIXED: "temp/fixed"
-            ICONS: "temp/icons"
-            TAG: ""
-            ZIP: ""
+  process:
+    runs-on: ubuntu-latest
+    needs: sync
+    steps:
+      #   Step 1
+      #   - Checkout Fork Repo
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        steps:
-            #   Step 1
-            #   - Checkout Fork Repo
-            - name: Checkout Repo
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+      #   Step 2
+      #   - Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-            #   Step 2
-            #   - Set up Node.js environment
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
+      #   Step 3
+      #   - Install npm packages
+      - name: Install Tools
+        run: |
+          npm install -g oslllo-svg-fixer
+          npm install -g svgtofont
 
-            #   Step 3
-            #   - Install oslllo-svg-fixer
-            - name: Install oslllo-svg-fixer
-              run: |
-                  npm install -g oslllo-svg-fixer
+      #   Step 4
+      #   - Create temp to work on this directory
+      #   - Create temp/fixed to fix and store outine icons on this directory
+      #   - Create temp/icons to store filled and fixed outline icons on this directory
+      - name: Create Temporary Folders
+        run: |
+          mkdir -pv temp/icons temp/fixed
 
-            #   Step 4
-            #   - Create ~/.tmp to work on this directory
-            #   - Create ~/.tmp/fixed to fix and store outine icons on this directory
-            #   - Create ~/.tmp/icons to store filled and fixed outline icons on this directory
-            - name: Create Temporary Folders
-              run: |
-                  mkdir -pv ${{ env.TEMP }} ${{ env.FIXED }} ${{env.ICONS }}
-                  tree -ad
+      #   Step 5
+      #   - Fix outline icons from "icons/outline" to "temp/fixed".
+      #   - Move outline icons from "temp/fixed" to "temp/icons".
+      #   - Remove "~/fixed" folder.
+      #   - Rename & Copy filled icons from "icons/filled" to "temp/icons".
+      - name: Process Icons
+        run: |
+          oslllo-svg-fixer --source icons/outline --destination temp/fixed
 
-            #   Step 5
-            #   - Fix outline icons from "icons/outline" to "~/.tmp/fixed".
-            #   - Move outline icons from "~/.tmp/fixed" to "~/.tmp/icons".
-            #   - Remove "~/fixed" folder.
-            #   - Rename & Copy filled icons from "icons/filled" to "~/.tmp/icons".
-            - name: Process Icons
-              run: |
-                  oslllo-svg-fixer --source icons/outline --destination ${{ env.FIXED }}
+          for SVG in temp/fixed/*.svg; do
+            mv -fv $SVG "temp/icons/$(basename "${SVG%.svg}")-outline.svg"
+          done
 
-                  for SVG in ${{ env.FIXED }}/*.svg; do
-                    mv -fv $SVG "${{ env.ICONS }}/$(basename "${SVG%.svg}")-outline.svg"
-                  done
+          for SVG in icons/filled/*.svg; do
+            mv -fv $SVG "temp/icons/$(basename "${SVG%.svg}")-filled.svg"
+          done
 
-                  for SVG in icons/filled/*.svg; do
-                    mv -fv $SVG "${{ env.ICONS }}/$(basename "${SVG%.svg}")-filled.svg"
-                  done
+          rm -frv temp/fixed
 
-                  rm -frv "${{ env.FIXED }}"
+      #   Step 6
+      #   - Convert SVGs to TTF and JSON Map
+      - name: Convert Icons to Font
+        run: |
+          svgtofont --sources temp/fixed --output temp --fontName tabler-icons
 
-            #   Step 6
-            #   - Get latest tag from upstream
-            #   - Create a zip file from ~/.tmp/icons
-            - name: Zip Icons
-              run: |
-                  LATEST_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)
+      #   Step 7
+      #   - Get latest tag from upstream
+      #   - Create a zip file from temp/icons
+      - name: Zip Icons
+        run: |
+          LATEST_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)
+          echo "TAG=${LATEST_TAG}" >> $GITHUB_ENV
 
-                  echo "TAG=$LATEST_TAG" >> $GITHUB_ENV
-                  echo "${{ env.TAG }}"
+          zip -r temp/tabler-icons.zip temp/icons
 
-                  echo "ZIP=${TEMP}/kustom-tabler-icons-${{ env.TAG }}.zip" >> $GITHUB_ENV
-                  echo "${{env.ZIP}}"
-
-                  zip -r "${{ env.ZIP }}" "${{ env.ICONS }}"
-
-            #   Step 7
-            #   - Create or Update GitHub Release
-            #   - Upload ZIP to GitHub Release
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: "${{ env.ZIP }}"
-                  name: "Kustom Tabler Icons ${{ env.TAG }}"
-                  tag_name: "${{ env.TAG }}"
+      #   Step 8
+      #   - Create or Update GitHub Release
+      #   - Upload ZIP to GitHub Release
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            temp/tabler-icons.ttf
+            temp/tabler-icons.json
+            tabler-icons.zip
+          name: "Kustom Tabler Icons ${{ env.TAG }}"
+          body_path: "Download `tabler-icons.ttf` and `tabler-icons.json` and paste them in Kustom's fonts folder."
+          tag_name: ${{ env.TAG }}
