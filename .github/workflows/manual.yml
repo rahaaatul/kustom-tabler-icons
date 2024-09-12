@@ -80,7 +80,7 @@ jobs:
                   echo $FIXED
                   echo $ICONS
 
-                  mkdir -p "$TEMP" "$FIXED" "$ICONS "
+                  mkdir -p "$TEMP" "$FIXED" "$ICONS"
 
             #   Step 5
             #   - Fix outline icons from "icons/outline" to "~/fixed".
