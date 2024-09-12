@@ -108,7 +108,6 @@ jobs:
           files: |
             temp/tabler-icons.ttf
             temp/tabler-icons.json
-            tabler-icons.zip
+            temp/tabler-icons.zip
           name: "Kustom Tabler Icons ${{ env.TAG }}"
-          body_path: "Download `tabler-icons.ttf` and `tabler-icons.json` and paste them in Kustom's fonts folder."
           tag_name: ${{ env.TAG }}
