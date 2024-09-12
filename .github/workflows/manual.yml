@@ -26,13 +26,13 @@ jobs:
             echo "Icons are up to date."
             exit 0
           else
-            git checkout -b temp
+            git checkout --orphan temp
+            git add icons/filled icons/outline
             git commit -m "Synced Icons"
-            git checkout main
-            git reset --hard temp
+            git branch -M main
             git push origin main --force
-            git branch -d temp
           fi
+
 
   process:
     runs-on: ubuntu-latest
