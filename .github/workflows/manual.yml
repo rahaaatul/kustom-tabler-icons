@@ -15,6 +15,8 @@ jobs:
         #   Step 2: Sync icons folder from upstream
         -   name: Sync Upstream Icons
             run:    |
+                git config user.name "${{ github.actor }}"
+                git config user.email "${{ github.actor }}@users.noreply.github.com"
                 git remote get-url upstream || git remote add upstream https://github.com/tabler/tabler-icons.git
                 git fetch upstream
                 git checkout upstream/main -- icons/filled icons/outline
@@ -33,6 +35,7 @@ jobs:
                 fi
     process:
             runs-on: ubuntu-latest
+            needs: sync
             steps:
             #   Step 1: Checkout Fork Repo
             -   name: Checkout Repo
@@ -70,7 +73,7 @@ jobs:
             #   - Rename & Copy filled icons from "icons/filled" to "~/fixed".
             -   name: Process Icons
                 run:    |
-                    oslllo-svg-fixer --source icons/outline --destination "${FIXED}"
+                    oslllo-svg-fixer --source icons/outline --destination "$FIXED"
 
                     for SVG in "${FIXED}/*.svg"; do
                         mv -fv "$SVG" "${ICONS}/$(basename "${SVG%.svg}")-outline.svg"
