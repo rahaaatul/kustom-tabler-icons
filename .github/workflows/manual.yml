@@ -39,9 +39,9 @@ jobs:
         runs-on: ubuntu-latest
         needs: sync
         env:
-            TEMP: "$HOME/.tmp"
-            FIXED: "$HOME/.tmp/fixed"
-            ICONS: "$HOME/.tmp/icons"
+            TEMP: ""
+            FIXED: ""
+            ICONS: ""
             TAG: ""
             ZIP: ""
 
@@ -72,6 +72,10 @@ jobs:
             #   - Create ~/.tmp/icons to store filled and fixed outline icons on this directory
             - name: Create Temporary Folders
               run: |
+                  TEMP="$HOME/.tmp"
+                  FIXED="$TEMP/fixed"
+                  ICONS="$TEMP/icons"
+
                   echo $TEMP
                   echo $FIXED
                   echo $ICONS
