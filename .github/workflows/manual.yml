@@ -75,17 +75,9 @@ jobs:
                   TEMP=$HOME/.tmp
                   FIXED=$TEMP/fixed
                   ICONS=$TEMP/icons
-                  echo $HOME
-                  echo $TEMP
-                  echo $FIXED
-                  echo $ICONS
 
-                  mkdir -p "$TEMP" "$FIXED" "$ICONS"
-
-                  tree
-                  ls -a
-                  ls -a $TEMP
-                  lis -a "$TEMP"
+                  tree -d $TEMP
+                  mkdir -pv $TEMP $FIXED $ICONS
 
             #   Step 5
             #   - Fix outline icons from "icons/outline" to "~/fixed".
@@ -96,15 +88,15 @@ jobs:
               run: |
                   oslllo-svg-fixer --source icons/outline --destination $FIXED
 
-                  for SVG in "$FIXED"/*.svg; do
-                    mv -fv "$SVG" "$ICONS/$(basename "${SVG%.svg}")-outline.svg"
+                  for SVG in $FIXED/*.svg; do
+                    mv -fv $SVG "$ICONS/$(basename "${SVG%.svg}")-outline.svg"
                   done
 
                   for SVG in icons/filled/*.svg; do
-                    mv -fv "$SVG" "$ICONS/$(basename "${SVG%.svg}")-filled.svg"
+                    mv -fv $SVG $ICONS/"$(basename "${SVG%.svg}")-filled.svg"
                   done
 
-                  rm -frv "$FIXED"
+                  rm -frv $FIXED
 
             #   Step 6
             #   - Get latest tag from upstream
@@ -116,7 +108,7 @@ jobs:
                   echo "TAG=$LATEST_TAG" >> $GITHUB_ENV
                   echo "ZIP=${TEMP}/kustom-tabler-icons-${TAG}.zip" >> $GITHUB_ENV
 
-                  zip -r "$ZIP" "$ICONS"
+                  zip -r $ZIP $ICONS
 
             #   Step 7
             #   - Create or Update GitHub Release
@@ -124,6 +116,6 @@ jobs:
             - name: Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: "$ZIP"
-                  name: "Kustom Tabler Icons ${TAG}"
-                  tag_name: "$TAG"
+                  files: $ZIP
+                  name: Kustom Tabler Icons ${TAG}
+                  tag_name: $TAG
