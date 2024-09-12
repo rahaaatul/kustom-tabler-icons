@@ -94,7 +94,7 @@ jobs:
             #   - Rename & Copy filled icons from "icons/filled" to "~/fixed".
             - name: Process Icons
               run: |
-                  oslllo-svg-fixer --source icons/outline --destination "$FIXED"
+                  oslllo-svg-fixer --source icons/outline --destination $FIXED
 
                   for SVG in "$FIXED"/*.svg; do
                     mv -fv "$SVG" "$ICONS/$(basename "${SVG%.svg}")-outline.svg"
