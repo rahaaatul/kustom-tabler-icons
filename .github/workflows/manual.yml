@@ -72,12 +72,11 @@ jobs:
             #   - Create ~/.tmp/icons to store filled and fixed outline icons on this directory
             - name: Create Temporary Folders
               run: |
-                  TEMP=$HOME/.tmp
-                  FIXED=$TEMP/fixed
-                  ICONS=$TEMP/icons
-
-                  tree -d $TEMP
-                  mkdir -pv $TEMP $FIXED $ICONS
+                  TEMP=".tmp"
+                  FIXED=".tmp/fixed"
+                  ICONS=".tmp/icons"
+                  tree -d
+                  mkdir -pv "$TEMP" "$FIXED" "$ICONS"
 
             #   Step 5
             #   - Fix outline icons from "icons/outline" to "~/fixed".
