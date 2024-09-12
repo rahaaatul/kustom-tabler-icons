@@ -70,27 +70,24 @@ jobs:
       #   Step 5
       #   - Fix outline icons from "icons/outline" to "temp/fixed".
       #   - Move outline icons from "temp/fixed" to "temp/icons".
-      #   - Remove "~/fixed" folder.
       #   - Rename & Copy filled icons from "icons/filled" to "temp/icons".
       - name: Process Icons
         run: |
           oslllo-svg-fixer --source icons/outline --destination temp/fixed
 
           for SVG in temp/fixed/*.svg; do
-            mv -fv $SVG "temp/icons/$(basename "${SVG%.svg}")-outline.svg"
+            mv -f $SVG "temp/icons/$(basename "${SVG%.svg}")-outline.svg"
           done
 
           for SVG in icons/filled/*.svg; do
-            mv -fv $SVG "temp/icons/$(basename "${SVG%.svg}")-filled.svg"
+            mv -f $SVG "temp/icons/$(basename "${SVG%.svg}")-filled.svg"
           done
-
-          rm -frv temp/fixed
 
       #   Step 6
       #   - Convert SVGs to TTF and JSON Map
-      - name: Convert Icons to Font
+      - name: Convert Icons
         run: |
-          svgtofont --sources temp/fixed --output temp --fontName tabler-icons
+          svgtofont --sources temp/icons --output temp --fontName tabler-icons
 
       #   Step 7
       #   - Get latest tag from upstream
