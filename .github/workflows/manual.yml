@@ -39,9 +39,9 @@ jobs:
         runs-on: ubuntu-latest
         # needs: sync
         env:
-            TEMP: ""
-            FIXED: ""
-            ICONS: ""
+            TEMP: ".tmp"
+            FIXED: ".tmp/fixed"
+            ICONS: ".tmp/icons"
             TAG: ""
             ZIP: ""
 
@@ -72,11 +72,8 @@ jobs:
             #   - Create ~/.tmp/icons to store filled and fixed outline icons on this directory
             - name: Create Temporary Folders
               run: |
-                  TEMP=".tmp"
-                  FIXED=".tmp/fixed"
-                  ICONS=".tmp/icons"
-                  tree -d
-                  mkdir -pv "$TEMP" "$FIXED" "$ICONS"
+                  mkdir -pv ${{ env.TEMP }} ${{ env.FIXED }} ${{env.ICONS }}
+                  tree -ad
 
             #   Step 5
             #   - Fix outline icons from "icons/outline" to "~/fixed".
@@ -85,7 +82,7 @@ jobs:
             #   - Rename & Copy filled icons from "icons/filled" to "~/fixed".
             - name: Process Icons
               run: |
-                  oslllo-svg-fixer --source icons/outline --destination $FIXED
+                  oslllo-svg-fixer --source icons/outline --destination ${{ env.FIXED }}
 
                   for SVG in $FIXED/*.svg; do
                     mv -fv $SVG "$ICONS/$(basename "${SVG%.svg}")-outline.svg"
