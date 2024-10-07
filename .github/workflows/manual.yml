@@ -23,9 +23,6 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-      - name: Add Upstream Remote
-        run: git remote add upstream https://github.com/tabler/tabler-icons.git
-
       - name: Fetch Updates from Upstream
         run: git fetch upstream
 
@@ -73,42 +70,35 @@ jobs:
     needs: sync
     if: ${{ needs.sync.outputs.SYNC_TRUE == '1' }}
     steps:
-      #   Step 1
-      #   - Checkout Fork Repo
+      # Step 1
+      # - Checkout Fork Repo
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: main
 
-      #   Step 2
-      #   - Set up Node.js environment
-      - name: Set up Node.js
+      # Step 2
+      # - Set up Node
+      # - Install npm packages
+      - name: Set up environment
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      #   Step 3
-      #   - Install npm packages
-      - name: Install Tools
-        run: |
+      - run: |
           npm install -g oslllo-svg-fixer
           npm install -g svgtofont
 
-      #   Step 4
-      #   - Create temp to work on this directory
-      #   - Create temp/fixed to fix and store outine icons on this directory
-      #   - Create temp/icons to store filled and fixed outline icons on this directory
-      - name: Create Temporary Folders
-        run: |
-          mkdir -pv temp/icons temp/fixed
-
-      #   Step 5
-      #   - Fix outline icons from "icons/outline" to "temp/fixed".
-      #   - Move outline icons from "temp/fixed" to "temp/icons".
-      #   - Rename & Copy filled icons from "icons/filled" to "temp/icons".
+      # Step 3
+      # - Create temp to work on this directory
+      # - Create temp/fixed to fix and store outline icons on this directory
+      # - Create temp/icons to store filled and fixed outline icons on this directory
+      # - Fix outline icons from "icons/outline" to "temp/fixed".
+      # - Move outline icons from "temp/fixed" to "temp/icons".
+      # - Rename & Copy filled icons from "icons/filled" to "temp/icons".
       - name: Process Icons
         run: |
+          mkdir -pv temp/icons temp/fixed
 
           oslllo-svg-fixer --source icons/outline --destination temp/fixed
 
@@ -120,25 +110,17 @@ jobs:
             mv -f $SVG "temp/icons/$(basename "${SVG%.svg}")-filled.svg"
           done
 
-      #   Step 6
-      #   - Convert SVGs to TTF and JSON Map
-      - name: Convert Icons
+      # Step 4
+      # - Convert SVGs to TTF and JSON Map
+      # - Fix JSON to work with Kustom
+      - name: Convert Icons to Font
         run: |
           svgtofont --sources temp/icons --output temp --fontName tabler-icons
+          node .github/scripts/fix-json.js
 
-      #   Step 7
-      #   - Get latest tag from upstream
-      #   - Create a zip file from temp/icons
-      - name: Zip Icons
-        run: |
-          LATEST_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)
-          echo "TAG=${LATEST_TAG}" >> $GITHUB_ENV
-
-          zip -r temp/tabler-icons.zip temp/icons
-
-      #   Step 8
-      #   - Create or Update GitHub Release
-      #   - Upload ZIP to GitHub Release
+      # Step 5
+      # - Create or Update GitHub Release
+      # - Upload ZIP to GitHub Release
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
