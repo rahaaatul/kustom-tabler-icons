@@ -28,7 +28,7 @@ jobs:
           if [ "$LATEST_UPSTREAM_TAG" != "$LATEST_TAG" ]; then
             echo "NEED_UPDATE=1" >> $GITHUB_OUTPUT
           else
-            echo "NEED_UPDATE=1" >> $GITHUB_OUTPUT
+            echo "NEED_UPDATE=0" >> $GITHUB_OUTPUT
           fi
 
   sync:
