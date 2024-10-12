@@ -1,0 +1,117 @@
+name: Icon Modifier
+permissions: write-all
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      SYNC_TRUE: ${{ steps.need_sync.outputs.SYNC_TRUE }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add Upstream Remote
+        run:  |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git remote add upstream https://github.com/tabler/tabler-icons.git
+
+      - name: Fetch Updates from Upstream
+        run: git fetch upstream
+
+      - name: Checkout Icons from Upstream
+        run: git checkout upstream/main -- icons/filled icons/outline
+
+      - name: Check for Icon Changes
+        id: need_sync
+        continue-on-error: true
+        run: |
+          if git diff --cached --quiet; then
+            echo "SYNC_TRUE=0" >> $GITHUB_ENV
+            echo "SYNC_TRUE=0" >> $GITHUB_OUTPUT
+            echo "Icons are up to date."
+            exit 0
+          else
+            echo "SYNC_TRUE=1" >> $GITHUB_ENV
+            echo "SYNC_TRUE=1" >> $GITHUB_OUTPUT
+            echo "Icons are not up to date."
+          fi
+
+      - name: Create Temporary Branch
+        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
+        run: git checkout --orphan temp
+
+      - name: Stage Files
+        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
+        run: git add icons/filled icons/outline .github/workflows/manual.yml
+
+      - name: Commit Changes
+        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
+        run: git commit -m "Synced Icons"
+
+      - name: Replace Old Branch with New Branch
+        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
+        run: git branch -D main && git branch -M main
+
+      - name: Push Changes
+        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
+        run: git push origin main --force
+
+  process:
+    runs-on: ubuntu-latest
+    needs: sync
+    if: ${{ needs.sync.outputs.SYNC_TRUE == '1' }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: |
+          npm install -g oslllo-svg-fixer
+          npm install -g svgtofont
+
+      - name: Create Temporary Folder
+        run: mkdir -pv temp/icons temp/fixed
+
+      - name: Fix Outline Icons
+        run: oslllo-svg-fixer --source icons/outline --destination temp/fixed
+
+      - name: Rename & move fixed icons to temp folder
+        run: |
+          for SVG in temp/fixed/*.svg; do
+            mv -f $SVG "temp/icons/$(basename "${SVG%.svg}")-outline.svg"
+          done
+
+      - name: Rename & move filled icons to temp folder
+        run: |
+          for SVG in icons/filled/*.svg; do
+            mv -f $SVG "temp/icons/$(basename "${SVG%.svg}")-filled.svg"
+          done
+
+      - name: Pack icons into a font file
+        run: svgtofont --sources temp/icons --output temp --fontName tabler-icons
+
+      - name: Fix Fonticon ID's
+        run: node .github/scripts/fix-json.js
+
+      - name: Release Font Files
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            temp/tabler-icons.ttf
+            temp/tabler-icons.json
+            temp/tabler-icons.zip
+          name: "Kustom Tabler Icons ${{ env.TAG }}"
+          tag_name: ${{ env.TAG }}
