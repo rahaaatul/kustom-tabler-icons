@@ -9,30 +9,34 @@ jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
-      TAG: ${{ steps.compare_tags.outputs.TAG }}
+      TAG: ${{ env.LATEST_UPSTREAM_TAG }}
       NEED_UPDATE: ${{ steps.compare_tags.outputs.NEED_UPDATE }}
     steps:
       - name: Get Latest Tag
-        run: LATEST_TAG=$(curl -s https://api.github.com/repos/rahaaatul/kustom-tabler-icons/releases/latest | jq -r .tag_name)
+        id: latest_tag
+        run: |
+          echo "LATEST_TAG=$(curl -s https://api.github.com/repos/rahaaatul/kustom-tabler-icons/releases/latest | jq -r .tag_name)" >> $GITHUB_ENV
 
       - name: Get Latest Upstream Tag
-        run: LATEST_UPSTREAM_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)
+        id: latest_upstream_tag
+        run: |
+          echo "LATEST_UPSTREAM_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)" >> $GITHUB_ENV
 
       - name: Compare Latest Tags
         id: compare_tags
         run: |
-          if [ $LATEST_UPSTREAM_TAG != $LATEST_TAG ]; then
-            echo "TAG=$LATEST_UPSTREAM_TAG" >> $GITHUB_OUTPUT
+          if [ "$LATEST_UPSTREAM_TAG" != "$LATEST_TAG" ]; then
             echo "NEED_UPDATE=1" >> $GITHUB_OUTPUT
           else
-            echo "NEED_UPDATE=0" >> $GITHUB_OUTPUT
-            exit 0
+            echo "NEED_UPDATE=1" >> $GITHUB_OUTPUT
           fi
 
   sync:
     needs: check
     if: ${{ needs.check.outputs.NEED_UPDATE == '1' }}
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.check.outputs.TAG }}
     outputs:
       TAG: ${{ needs.check.outputs.TAG }}
     steps:
@@ -43,10 +47,23 @@ jobs:
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git remote add upstream https://github.com/tabler/tabler-icons.git
+          if git remote | grep -q "upstream"; then
+            echo "Remote 'upstream' already exists."
+          else
+            git remote add upstream https://github.com/tabler/tabler-icons.git
+          fi
 
-      - name: Fetch Upstream Updates
-        run: git fetch upstream
+      - name: Fetch Upstream
+        run: |
+          git config --global http.postBuffer 524288000
+          while true; do
+            if git fetch upstream main --depth=1 --no-tags; then
+              break
+            else
+              echo "Fetch failed, retrying in 10 seconds..."
+              sleep 10
+            fi
+          done
 
       - name: Checkout Icons
         run: git checkout upstream/main -- icons/filled icons/outline
@@ -55,26 +72,27 @@ jobs:
         run: git add icons/filled icons/outline .github/workflows/manual.yml
 
       - name: Commit Changes
-        run: git commit -m "Synced Icons"
+        run: git commit -m "${{ env.TAG }}"
 
       - name: Push Changes
         run: git push origin main
 
-  process:
+  release:
     needs: sync
-    if: needs.sync.result == 'success'
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.sync.outputs.TAG }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Set up environment
+      - name: Install NodeJS
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: |
-          npm install -g oslllo-svg-fixer
-          npm install -g svgtofont
+      
+      - name: Install NodeJS Packages
+        run: npm install -g oslllo-svg-fixer svgtofont
 
       - name: Create Temporary Folder
         run: mkdir -pv temp/icons temp/fixed
@@ -106,5 +124,5 @@ jobs:
           files: |
             temp/tabler-icons.ttf
             temp/tabler-icons.json
-          name: "${{ needs.sync.outputs.TAG }}"
-          tag_name: "${{ needs.sync.outputs.TAG }}"
+          name: "${{ env.TAG }}"
+          tag_name: "${{ env.TAG }}"
