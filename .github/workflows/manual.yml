@@ -6,73 +6,67 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync:
+  check:
     runs-on: ubuntu-latest
     outputs:
-      SYNC_TRUE: ${{ steps.need_sync.outputs.SYNC_TRUE }}
+      TAG: ${{ steps.compare_tags.outputs.TAG }}
+      NEED_UPDATE: ${{ steps.compare_tags.outputs.NEED_UPDATE }}
+    steps:
+      - name: Get Latest Tag
+        run: LATEST_TAG=$(curl -s https://api.github.com/repos/rahaaatul/kustom-tabler-icons/releases/latest | jq -r .tag_name)
+
+      - name: Get Latest Upstream Tag
+        run: LATEST_UPSTREAM_TAG=$(curl -s https://api.github.com/repos/tabler/tabler-icons/releases/latest | jq -r .tag_name)
+
+      - name: Compare Latest Tags
+        id: compare_tags
+        run: |
+          if [ $LATEST_UPSTREAM_TAG != $LATEST_TAG ]; then
+            echo "TAG=$LATEST_UPSTREAM_TAG" >> $GITHUB_OUTPUT
+            echo "NEED_UPDATE=1" >> $GITHUB_OUTPUT
+          else
+            echo "NEED_UPDATE=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+  sync:
+    needs: check
+    if: ${{ needs.check.outputs.NEED_UPDATE == '1' }}
+    runs-on: ubuntu-latest
+    outputs:
+      TAG: ${{ needs.check.outputs.TAG }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Add Upstream Remote
-        run:  |
+      - name: Add Upstream
+        run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git remote add upstream https://github.com/tabler/tabler-icons.git
 
-      - name: Fetch Updates from Upstream
+      - name: Fetch Upstream Updates
         run: git fetch upstream
 
-      - name: Checkout Icons from Upstream
+      - name: Checkout Icons
         run: git checkout upstream/main -- icons/filled icons/outline
 
-      - name: Check for Icon Changes
-        id: need_sync
-        continue-on-error: true
-        run: |
-          if git diff --cached --quiet; then
-            echo "SYNC_TRUE=0" >> $GITHUB_ENV
-            echo "SYNC_TRUE=0" >> $GITHUB_OUTPUT
-            echo "Icons are up to date."
-            exit 0
-          else
-            echo "SYNC_TRUE=1" >> $GITHUB_ENV
-            echo "SYNC_TRUE=1" >> $GITHUB_OUTPUT
-            echo "Icons are not up to date."
-          fi
-
-      - name: Create Temporary Branch
-        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
-        run: git checkout --orphan temp
-
       - name: Stage Files
-        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
         run: git add icons/filled icons/outline .github/workflows/manual.yml
 
       - name: Commit Changes
-        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
         run: git commit -m "Synced Icons"
 
-      - name: Replace Old Branch with New Branch
-        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
-        run: git branch -D main && git branch -M main
-
       - name: Push Changes
-        if: ${{ steps.need_sync.outputs.SYNC_TRUE == '1' }}
-        run: git push origin main --force
+        run: git push origin main
 
   process:
-    runs-on: ubuntu-latest
     needs: sync
-    if: ${{ needs.sync.outputs.SYNC_TRUE == '1' }}
+    if: needs.sync.result == 'success'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: main
 
       - name: Set up environment
         uses: actions/setup-node@v4
@@ -103,7 +97,7 @@ jobs:
       - name: Pack icons into a font file
         run: svgtofont --sources temp/icons --output temp --fontName tabler-icons
 
-      - name: Fix Fonticon ID's
+      - name: Fix font icon ID's
         run: node .github/scripts/fix-json.js
 
       - name: Release Font Files
@@ -112,6 +106,5 @@ jobs:
           files: |
             temp/tabler-icons.ttf
             temp/tabler-icons.json
-            temp/tabler-icons.zip
-          name: "Kustom Tabler Icons ${{ env.TAG }}"
-          tag_name: ${{ env.TAG }}
+          name: "${{ needs.sync.outputs.TAG }}"
+          tag_name: "${{ needs.sync.outputs.TAG }}"
